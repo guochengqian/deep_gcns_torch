@@ -63,9 +63,9 @@ class DenseFPSSampler(BaseSampler):
         """
         if len(data.pos.shape) != 3:
             raise ValueError(" This class is for dense data and expects the pos tensor to be of dimension 2")
-        idx = tp.furthest_point_sample(data.pos, self._get_num_to_sample(data.pos.shape[1]))
+        idx = tp.furthest_point_sample(data.pos, self._get_num_to_sample(data.pos.shape[1])).to(torch.long)
         data.pos = torch.gather(data.pos, 1, idx.unsqueeze(-1).repeat(1, 1, data.pos.shape[-1]))
-        data.x = torch.gather(data.x, 2, idx.unsqueeze(1).repeat(1, data.x.shape[1], 1))
+        data.x = torch.gather(data.x, 2, idx.unsqueeze(1).unsqueeze(-1).repeat(1, data.x.shape[1], 1, 1))
         return data, idx
 
 
@@ -79,9 +79,9 @@ class DenseRandomSampler(BaseSampler):
     def sample(self, data, **kwargs):
         if len(data.pos.shape) != 3:
             raise ValueError(" This class is for dense data and expects the pos tensor to be of dimension 2")
-        idx = torch.randint(0, data.pos.shape[1], (self._get_num_to_sample(data.pos.shape[1]),)).to(data.pos.device)
-        data.pos = torch.gather(data.pos, 1, idx.unsqueeze(-1).repeat(data.pos.shape[0], 1, data.pos.shape[-1]))
-        data.x = torch.gather(data.x, 2, idx.unsqueeze(0).repeat(data.x.shape[0], data.x.shape[1], 1).unsqueeze(-1))
+        idx = torch.randint(0, data.pos.shape[1], (data.pos.shape[0], self._get_num_to_sample(data.pos.shape[1]))).to(data.pos.device)
+        data.pos = torch.gather(data.pos, 1, idx.unsqueeze(-1).repeat(1, 1, data.pos.shape[-1]))
+        data.x = torch.gather(data.x, 2, idx.unsqueeze(1).unsqueeze(-1).repeat(1, data.x.shape[1], 1, 1))
         return data, idx
 
 
