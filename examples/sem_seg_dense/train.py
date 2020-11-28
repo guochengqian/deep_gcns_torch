@@ -6,7 +6,7 @@ from torch_geometric.data import DenseDataLoader
 import torch_geometric.transforms as T
 from torch.nn import DataParallel
 from config import OptInit
-from architecture import DenseDeepGCN
+from architecture import DeepGCNUNet
 from utils.ckpt_util import load_pretrained_models, load_pretrained_optimizer, save_checkpoint
 from utils.metrics import AverageMeter
 import logging
@@ -23,9 +23,10 @@ def main():
     opt.n_classes = train_loader.dataset.num_classes
 
     logging.info('===> Loading the network ...')
-    model = DenseDeepGCN(opt).to(opt.device)
+    model = DeepGCNUNet(opt)
     if opt.multi_gpus:
-        model = DataParallel(DenseDeepGCN(opt)).to(opt.device)
+        model = DataParallel(model)
+    model = model.to(opt.device)
 
     logging.info('===> loading pre-trained ...')
     model, opt.best_value, opt.epoch = load_pretrained_models(model, opt.pretrained_model, opt.phase)
@@ -87,11 +88,12 @@ def train(model, train_loader, optimizer, criterion, opt):
 
             if not opt.multi_gpus:
                 data = data.to(opt.device)
-            inputs = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
+            # inputs = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
+            data.x = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
             gt = data.y.to(opt.device)
             # ------------------ zero, output, loss
             optimizer.zero_grad()
-            out = model(inputs)
+            out = model(data.pos, data.x)
             loss = criterion(out, gt)
 
             # ------------------ optimization
@@ -110,10 +112,10 @@ def test(model, loader, opt):
         for i, data in enumerate(tqdm(loader)):
             if not opt.multi_gpus:
                 data = data.to(opt.device)
-            inputs = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
             gt = data.y
 
-            out = model(inputs)
+            data.x = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
+            out = model(data.pos, data.x)
             pred = out.max(dim=1)[1]
 
             pred_np = pred.cpu().numpy()

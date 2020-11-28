@@ -1,11 +1,68 @@
 import torch
-from gcn_lib.dense import BasicConv, GraphConv2d, PlainDynBlock2d, ResDynBlock2d, DenseDynBlock2d, DenseDilatedKnnGraph
+from gcn_lib.dense import (BasicConv, MLP, GraphConv2d, PlainDynBlock2d, ResDynBlock2d,
+                           DenseDynBlock2d, DenseDilatedKnnGraph, DynConv2d)
 from torch.nn import Sequential as Seq
+from gcn_lib.dense.sampling import DenseRandomSampler, DenseFPSSampler
+from gcn_lib.dense.upsampling import DenseFPModule
+from torch_geometric.data import Data
+
+#
+# class DenseDeepGCN(torch.nn.Module):
+#     def __init__(self, opt):
+#         super(DenseDeepGCN, self).__init__()
+#         channels = opt.n_filters
+#         k = opt.k
+#         act = opt.act
+#         norm = opt.norm
+#         bias = opt.bias
+#         epsilon = opt.epsilon
+#         stochastic = opt.stochastic
+#         conv = opt.conv
+#         c_growth = channels
+#         self.n_blocks = opt.n_blocks
+#
+#         self.knn = DenseDilatedKnnGraph(k, 1, stochastic, epsilon)
+#         self.head = GraphConv2d(opt.in_channels, channels, conv, act, norm, bias)
+#
+#         if opt.block.lower() == 'res':
+#             self.backbone = Seq(*[ResDynBlock2d(channels, k, 1+i, conv, act, norm, bias, stochastic, epsilon)
+#                                   for i in range(self.n_blocks-1)])
+#             fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
+#         elif opt.block.lower() == 'dense':
+#             self.backbone = Seq(*[DenseDynBlock2d(channels+c_growth*i, c_growth, k, 1+i, conv, act,
+#                                                   norm, bias, stochastic, epsilon)
+#                                   for i in range(self.n_blocks-1)])
+#             fusion_dims = int(
+#                 (channels + channels + c_growth * (self.n_blocks - 1)) * self.n_blocks // 2)
+#         else:
+#             stochastic = False
+#
+#             self.backbone = Seq(*[PlainDynBlock2d(channels, k, 1, conv, act, norm,
+#                                                   bias, stochastic, epsilon)
+#                                   for i in range(self.n_blocks - 1)])
+#             fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
+#
+#         self.fusion_block = BasicConv([fusion_dims, 1024], act, norm, bias)
+#         self.prediction = Seq(*[BasicConv([fusion_dims+1024, 512], act, norm, bias),
+#                                 BasicConv([512, 256], act, norm, bias),
+#                                 torch.nn.Dropout(p=opt.dropout),
+#                                 BasicConv([256, opt.n_classes], None, None, bias)])
+#
+#     def forward(self, inputs):
+#         feats = [self.head(inputs, self.knn(inputs[:, 0:3]))]
+#         for i in range(self.n_blocks-1):
+#             feats.append(self.backbone[i](feats[-1]))
+#         feats = torch.cat(feats, dim=1)
+#
+#         fusion = torch.max_pool2d(self.fusion_block(feats), kernel_size=[feats.shape[2], feats.shape[3]])
+#         fusion = torch.repeat_interleave(fusion, repeats=feats.shape[2], dim=2)
+#         return self.prediction(torch.cat((fusion, feats), dim=1)).squeeze(-1)
+#
 
 
-class DenseDeepGCN(torch.nn.Module):
+class DeepGCNUNet(torch.nn.Module):
     def __init__(self, opt):
-        super(DenseDeepGCN, self).__init__()
+        super(DeepGCNUNet, self).__init__()
         channels = opt.n_filters
         k = opt.k
         act = opt.act
@@ -17,46 +74,65 @@ class DenseDeepGCN(torch.nn.Module):
         c_growth = channels
         self.n_blocks = opt.n_blocks
 
+        self.down_layers = opt.down_layers
+        self.down_interval = opt.n_blocks // self.down_layers
+
+        # assert opt.block.lower() == "res" # only support ResGCN-UNet
+
         self.knn = DenseDilatedKnnGraph(k, 1, stochastic, epsilon)
         self.head = GraphConv2d(opt.in_channels, channels, conv, act, norm, bias)
 
-        if opt.block.lower() == 'res':
-            self.backbone = Seq(*[ResDynBlock2d(channels, k, 1+i, conv, act, norm, bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks-1)])
-            fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
-        elif opt.block.lower() == 'dense':
-            self.backbone = Seq(*[DenseDynBlock2d(channels+c_growth*i, c_growth, k, 1+i, conv, act,
-                                                  norm, bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks-1)])
-            fusion_dims = int(
-                (channels + channels + c_growth * (self.n_blocks - 1)) * self.n_blocks // 2)
+        if opt.sampler == 'random':
+            self.sampler = DenseRandomSampler(ratio=0.5)
+        elif opt.sampler == 'fps':
+            self.sampler = DenseFPSSampler(ratio=0.5)
         else:
-            stochastic = False
+            raise NotImplementedError("{} is not implemented".format(opt.sampler))
 
-            self.backbone = Seq(*[PlainDynBlock2d(channels, k, 1, conv, act, norm,
-                                                  bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks - 1)])
-            fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
-
-        self.fusion_block = BasicConv([fusion_dims, 1024], act, norm, bias)
-        self.prediction = Seq(*[BasicConv([fusion_dims+1024, 512], act, norm, bias),
-                                BasicConv([512, 256], act, norm, bias),
-                                torch.nn.Dropout(p=opt.dropout),
-                                BasicConv([256, opt.n_classes], None, None, bias)])
-
-    def forward(self, inputs):
-        feats = [self.head(inputs, self.knn(inputs[:, 0:3]))]
+        # architecture is ResGCN
+        self.backbone = torch.nn.ModuleList()
         for i in range(self.n_blocks-1):
-            feats.append(self.backbone[i](feats[-1]))
-        feats = torch.cat(feats, dim=1)
+            if (i+1) % self.down_interval == 0:
+                self.backbone.append(DynConv2d(channels, channels*2, k, 1, conv, act, norm, bias, stochastic, epsilon))
+                channels = channels*2
+            else:
+                self.backbone.append(ResDynBlock2d(channels, k, 1, conv, act, norm, bias, stochastic, epsilon))
 
-        fusion = torch.max_pool2d(self.fusion_block(feats), kernel_size=[feats.shape[2], feats.shape[3]])
-        fusion = torch.repeat_interleave(fusion, repeats=feats.shape[2], dim=2)
-        return self.prediction(torch.cat((fusion, feats), dim=1)).squeeze(-1)
+        fusion_dims = channels
+        self.up_modules = torch.nn.ModuleList()
+        for i in range(self.down_layers):
+            self.up_modules.append(DenseFPModule([channels + channels//2, channels//2]))
+            channels = channels // 2
+            fusion_dims += channels
+
+        self.prediction = Seq(*[MLP([64, 64], act, norm, bias),
+                                MLP([64, 32], act, norm, bias),
+                                torch.nn.Dropout(p=opt.dropout),
+                                MLP([32, opt.n_classes], None, None, bias)])
+
+    def forward(self, pos, x):
+        data = Data(pos=pos, x=x)
+        feat_h = self.head(data.x, self.knn(data.x[:, 0:3]))
+        data.x = feat_h
+
+        stack_down = [data.clone()]
+        for i in range(self.n_blocks-1):
+            feat_h = self.backbone[i](data.x)
+            data.x = feat_h
+            if (i+1) % self.down_interval == 0:
+                data, idx = self.sampler(data.clone())
+                stack_down.append(data.clone())
+
+        feats = []
+        stack_down.pop()
+        for i in range(self.down_layers-1):
+            data = self.up_modules[i]((data, stack_down.pop()))
+            feats.append(data.x.clone())
+        return self.prediction(data.x).squeeze(-1)
 
 
 if __name__ == "__main__":
-    import random, numpy as np, argparse
+    import argparse
     seed = 0
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)

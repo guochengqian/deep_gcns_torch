@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-from torch.nn import Sequential as Seq, Linear as Lin, Conv2d
+from torch.nn import Sequential as Seq, Linear as Lin, Conv2d, Conv1d
 
 
 ##############################
@@ -33,15 +33,27 @@ def norm_layer(norm, nc):
     return layer
 
 
+def norm_layer1d(norm, nc):
+    # normalization layer 2d
+    norm = norm.lower()
+    if norm == 'batch':
+        layer = nn.BatchNorm1d(nc, affine=True)
+    elif norm == 'instance':
+        layer = nn.InstanceNorm1d(nc, affine=False)
+    else:
+        raise NotImplementedError('normalization layer [%s] is not found' % norm)
+    return layer
+
+
 class MLP(Seq):
     def __init__(self, channels, act='relu', norm=None, bias=True):
         m = []
         for i in range(1, len(channels)):
-            m.append(Lin(channels[i - 1], channels[i], bias))
+            m.append(Conv1d(channels[i - 1], channels[i], 1, bias=bias))
             if act is not None and act.lower() != 'none':
                 m.append(act_layer(act))
             if norm is not None and norm.lower() != 'none':
-                m.append(norm_layer(norm, channels[-1]))
+                m.append(norm_layer1d(norm, channels[-1]))
         super(MLP, self).__init__(*m)
 
 
