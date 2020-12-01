@@ -7,6 +7,8 @@ In this work, we present new ways to successfully train very deep GCNs. We borro
   <img src='./misc/intro.png' width=800>
 </p>
 
+## News
+- 2020/11/01: add the ResGCN+UNet experiment. add evaluation for over-smoothing (MAD, MADGap from [paper](https://arxiv.org/abs/1909.03211))
 ## Overview
 We do extensive experiments to show how different components (#Layers, #Filters, #Nearest Neighbors, Dilation, etc.) effect `DeepGCNs`. We also provide ablation studies on different type of Deep GCNs (MRGCN, EdgeConv, GraphSage and GIN).
 

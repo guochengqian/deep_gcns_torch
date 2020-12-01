@@ -87,8 +87,10 @@ class OptInit:
             self.args.step = -1
 
         else:
+            self.args.job_name = os.path.basename(args.pretrained_model).split('.')[0]
             self.args.exp_dir = os.path.dirname(args.pretrained_model)
-            self.args.res_dir = os.path.join(self.args.exp_dir, 'result', args.block)
+            self.args.res_dir = os.path.join(self.args.exp_dir, 'result', self.args.job_name
+                                             )
             pathlib.Path(self.args.res_dir).mkdir(parents=True, exist_ok=True)
 
         self._configure_logger()
@@ -142,7 +144,7 @@ class OptInit:
         self.args.loglevel = "info"
         numeric_level = getattr(logging, self.args.loglevel.upper(), None)
         if not isinstance(numeric_level, int):
-            raise ValueError('Invalid log level: {}'.format(self.args.loglevelloglevel))
+            raise ValueError('Invalid log level: {}'.format(self.args.loglevel))
 
             # configure logger to display and save log data
         log_format = logging.Formatter('%(asctime)s %(message)s')
@@ -150,7 +152,7 @@ class OptInit:
         logger.setLevel(numeric_level)
 
         file_handler = logging.FileHandler(os.path.join(self.args.exp_dir,
-                                                        '{}.log'.format(os.path.basename(self.args.exp_dir))))
+                                                        '{}.log'.format(os.path.basename(self.args.job_name))))
         file_handler.setFormatter(log_format)
         logger.addHandler(file_handler)
 

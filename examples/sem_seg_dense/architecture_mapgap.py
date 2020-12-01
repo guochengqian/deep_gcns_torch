@@ -52,11 +52,15 @@ class DenseDeepGCN(torch.nn.Module):
         feats = [self.head(x, self.knn(x[:, 0:3]))]
         for i in range(self.n_blocks-1):
             feats.append(self.backbone[i](feats[-1]))
+
+        featmaps = feats.copy()
         feats = torch.cat(feats, dim=1)
 
         fusion = torch.max_pool2d(self.fusion_block(feats), kernel_size=[feats.shape[2], feats.shape[3]])
         fusion = torch.repeat_interleave(fusion, repeats=feats.shape[2], dim=2)
-        return self.prediction(torch.cat((fusion, feats), dim=1)).squeeze(-1)
+        out = self.prediction(torch.cat((fusion, feats), dim=1))
+        featmaps.append(out.clone())
+        return out.squeeze(-1), featmaps
 
 
 class DeepGCNUNet(torch.nn.Module):
@@ -114,10 +118,12 @@ class DeepGCNUNet(torch.nn.Module):
         feat_h = self.head(data.x, self.knn(data.x[:, 0:3]))
         data.x = feat_h
 
+        # feat_maps = [feat_h.clone()]
         stack_down = [data.clone()]
         for i in range(self.n_blocks-1):
             feat_h = self.backbone[i](data.x)
             data.x = feat_h
+            # feat_maps.append(feat_h.clone())
             if (i+1) % self.down_interval == 0:
                 data, idx = self.sampler(data.clone())
                 stack_down.append(data.clone())
