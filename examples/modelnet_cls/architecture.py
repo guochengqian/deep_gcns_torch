@@ -18,7 +18,7 @@ class DeepGCN(torch.nn.Module):
         bias = opt.bias
         knn = 'matrix'  # implement knn using matrix multiplication
         epsilon = opt.epsilon
-        stochastic = opt.stochastic
+        stochastic = opt.use_stochastic
         conv = opt.conv
         c_growth = channels
         emb_dims = opt.emb_dims
