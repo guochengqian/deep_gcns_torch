@@ -8,6 +8,7 @@
 
 
 source ~/.bashrc
+export TORCH_CUDA_ARCH_LIST="7.0;7.5"   # v100: 7.0; 2080ti: 7.5; titan xp: 6.1
 
 # make sure system cuda version is the same with pytorch cuda
 # follow the instruction of PyTorch Geometric: https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html
@@ -32,3 +33,4 @@ pip install requests
 
 # install useful modules
 pip install tqdm
+
