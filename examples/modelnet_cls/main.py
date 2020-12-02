@@ -11,6 +11,7 @@ from utils.ckpt_util import load_pretrained_models, load_pretrained_optimizer
 from utils.metrics import AverageMeter
 from utils.loss import SmoothCrossEntropy
 from data import ModelNet40
+from tqdm import tqdm
 
 
 def train(model, train_loader, test_loader, opt):
@@ -84,7 +85,7 @@ def train_step(model, train_loader, optimizer, criterion, opt):
 
     train_pred = []
     train_true = []
-    for data, label in train_loader:
+    for data, label in tqdm(train_loader):
         data, label = data.to(opt.device), label.to(opt.device).squeeze()
         data = data.permute(0, 2, 1).unsqueeze(-1)
 
@@ -134,7 +135,7 @@ def infer(model, test_loader, criterion, opt):
 
 def save_ckpt(model, optimizer, scheduler, opt, name_post):
     # ------------------ save ckpt
-    filename = '{}/{}_model.pth'.format(opt.ckpt_dir, opt.jobname + '-' + name_post)
+    filename = '{}/{}_model.pth'.format(opt.ckpt_dir, opt.exp_name + '-' + name_post)
     model_cpu = {k: v.cpu() for k, v in model.state_dict().items()}
     state = {
         'epoch': opt.epoch,
