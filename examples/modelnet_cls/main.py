@@ -24,7 +24,7 @@ def train(model, train_loader, test_loader, opt):
         logging.info("===> Use Adam")
         optimizer = torch.optim.Adam(model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay)
 
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.epochs, eta_min=opt.lr)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, opt.max_epochs, eta_min=opt.lr)
     optimizer, scheduler, opt.lr = load_pretrained_optimizer(opt.pretrained_model, optimizer, scheduler, opt.lr)
 
     logging.info('===> Init Metric ...')
@@ -34,7 +34,7 @@ def train(model, train_loader, test_loader, opt):
     avg_acc_when_best = 0.
 
     logging.info('===> start training ...')
-    for _ in range(opt.epoch, opt.epochs):
+    for _ in range(opt.epoch, opt.epoch + opt.epochs):
         opt.epoch += 1
         # reset tracker
         opt.train_losses.reset()
@@ -57,7 +57,7 @@ def train(model, train_loader, test_loader, opt):
         logging.info(
             "===> Epoch {}/{}, Train Loss {:.4f}, Test Overall Acc {:.4f}, Test Avg Acc {:4f}, "
             "Best Test Overall Acc {:.4f}, Its test avg acc {:.4f}.".format(
-                opt.epoch, opt.epochs, opt.train_losses.avg, test_overall_acc,
+                opt.epoch, opt.max_epochs, opt.train_losses.avg, test_overall_acc,
                 test_class_acc, best_test_overall_acc, avg_acc_when_best))
 
         info = {

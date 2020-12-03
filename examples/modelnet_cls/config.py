@@ -37,7 +37,10 @@ class OptInit:
         parser.add_argument('--batch_size', type=int, default=32, metavar='batch_size',
                             help='mini-batch size (default:16))')
         parser.add_argument('--epochs', type=int, default=400, metavar='N',
-                            help='number of episode to train ')
+                            help="number of episode to train in this time (used for split training, "
+                                 "train a single task using multiple steps")
+        parser.add_argument('--max_epochs', type=int, default=400, metavar='N',
+                            help='total number of episode to train ')
         parser.add_argument('--use_sgd', type=bool, default=True, help='Use SGD')
         parser.add_argument('--weight_decay', type=float, default=1e-4, help='L2 regularization')
         parser.add_argument('--lr', type=float, default=1e-3, metavar='LR',

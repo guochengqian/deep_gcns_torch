@@ -67,15 +67,15 @@ def test(model, loader, opt):
 
             # removes the dominant classes such ceiling floor and wall. Class imbalance
             mask = (label != 0) * (label != 1) * (label != 2)
-            # for j in range(n_layers):
-            j = n_layers-1
-            feat = feats[j].squeeze(-1).permute(0, 2, 1)    # feat: B, N, C
-            mean_MAD, MADFarthest, MADClosest = batchwise_MADGap(feat, 16, j + 1)
-            MADFarthest = MADFarthest.view(-1)
-            MADClosest = MADClosest.view(-1)
-            mean_MAD_mat[i, j] = mean_MAD
-            MADFarthest_mat[i, j] = nanmean(MADFarthest[mask])
-            MADClosest_mat[i, j] = nanmean(MADClosest[mask])
+            for j in range(n_layers):
+            # j = n_layers-1
+                feat = feats[j].squeeze(-1).permute(0, 2, 1)    # feat: B, N, C
+                mean_MAD, MADFarthest, MADClosest = batchwise_MADGap(feat, 16, j + 1)
+                MADFarthest = MADFarthest.view(-1)
+                MADClosest = MADClosest.view(-1)
+                mean_MAD_mat[i, j] = mean_MAD
+                MADFarthest_mat[i, j] = nanmean(MADFarthest[mask])
+                MADClosest_mat[i, j] = nanmean(MADClosest[mask])
     MADGap = nanmean(MADFarthest_mat - MADClosest_mat, dim=0, keepdims=False)
     torch.save(MADGap, '{}/{}'.format(opt.res_dir, 'madgap.pt'))
     logging.info(MADGap)

@@ -34,6 +34,8 @@ class OptInit:
 
         # ----------------- Training related
         parser.add_argument('--batch_size', default=16, type=int, help='mini-batch size (default:16)')
+        parser.add_argument('--epochs', default=100, type=int, help='number of epochs to train in this time '
+                                                                    '(used for split training, train in multi times)')
         parser.add_argument('--total_epochs', default=100, type=int, help='number of total epochs to run')
         parser.add_argument('--save_freq', default=1, type=int, help='save model per num of epochs')
         parser.add_argument('--iter', default=0, type=int, help='number of iteration to start')
