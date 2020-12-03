@@ -15,6 +15,20 @@ import uuid
 from torch.utils.tensorboard import SummaryWriter
 
 
+def str2bool(v):
+    r""" str2bool
+    very useful if use bash to train.
+    """
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
 class OptInit:
     def __init__(self):
         parser = argparse.ArgumentParser(description='PyTorch implementation of Deep GCN For semantic segmentation')
@@ -36,7 +50,7 @@ class OptInit:
         parser.add_argument('--batch_size', default=16, type=int, help='mini-batch size (default:16)')
         parser.add_argument('--epochs', default=100, type=int, help='number of epochs to train in this time '
                                                                     '(used for split training, train in multi times)')
-        parser.add_argument('--total_epochs', default=100, type=int, help='number of total epochs to run')
+        parser.add_argument('--max_epochs', default=100, type=int, help='number of total epochs to run')
         parser.add_argument('--save_freq', default=1, type=int, help='save model per num of epochs')
         parser.add_argument('--iter', default=0, type=int, help='number of iteration to start')
         parser.add_argument('--lr_adjust_freq', default=20, type=int, help='decay lr after certain number of epochs')
@@ -58,7 +72,9 @@ class OptInit:
         parser.add_argument('--conv', default='edge', type=str, help='graph conv layer {edge, mr}')
         parser.add_argument('--act', default='relu', type=str, help='activation layer {relu, prelu, leakyrelu}')
         parser.add_argument('--norm', default='batch', type=str, help='{batch, instance, None} normalization')
-        parser.add_argument('--bias', default=True,  type=bool, help='bias of conv layer True or False')
+        parser.add_argument('--bias', type=str2bool, nargs='?',
+                            const=True, default=True,
+                            help='use bias')
         parser.add_argument('--n_filters', default=64, type=int, help='number of channels of deep features')
         parser.add_argument('--n_blocks', default=28, type=int, help='number of basic blocks')
         parser.add_argument('--dropout', default=0.3, type=float, help='ratio of dropout')
@@ -66,14 +82,16 @@ class OptInit:
         parser.add_argument('--sampler', default='random', type=str, help='sampling methods in UNet {random, fps}')
 
         # dilated knn
-        parser.add_argument('--use_unet', action="store_true",
+        parser.add_argument('--use_unet', type=str2bool, nargs='?',  # nargs='?' means zero or one arugment
+                            const=True, default=False,
                             help='use unet instead of dilated graph convolution')
-
-        parser.add_argument('--no_dilation', action="store_false", dest="use_dilation",
+        parser.add_argument('--use_dilation', type=str2bool, nargs='?',
+                            const=True, default=True,
                             help='use dilated knn or not')
-        parser.add_argument('--epsilon', default=0.2, type=float, help='stochastic epsilon for gcn')
-        parser.add_argument('--no_stochastic', action="store_false", dest="use_stochastic",
+        parser.add_argument('--use_stochastic', type=str2bool, nargs='?',
+                            const=True, default=True,
                             help='stochastic for gcn, True or False')
+        parser.add_argument('--epsilon', default=0.2, type=float, help='stochastic epsilon for gcn')
 
         args = parser.parse_args()
 
@@ -178,6 +196,3 @@ class OptInit:
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
-
-
-
