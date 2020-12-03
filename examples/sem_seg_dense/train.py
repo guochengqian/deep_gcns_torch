@@ -6,7 +6,7 @@ from torch_geometric.data import DenseDataLoader
 import torch_geometric.transforms as T
 from torch.nn import DataParallel
 from config import OptInit
-from architecture import DeepGCNUNet
+from architecture import DeepGCNUNet, DenseDeepGCN
 from utils.ckpt_util import load_pretrained_models, load_pretrained_optimizer, save_checkpoint
 from utils.metrics import AverageMeter
 import logging
@@ -23,7 +23,12 @@ def main():
     opt.n_classes = train_loader.dataset.num_classes
 
     logging.info('===> Loading the network ...')
-    model = DeepGCNUNet(opt)
+
+    if opt.use_unet:
+        model = DeepGCNUNet(opt)
+    else:
+        model = DenseDeepGCN(opt)
+
     if opt.multi_gpus:
         model = DataParallel(model)
     model = model.to(opt.device)

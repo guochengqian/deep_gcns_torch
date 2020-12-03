@@ -66,8 +66,15 @@ class OptInit:
         parser.add_argument('--sampler', default='random', type=str, help='sampling methods in UNet {random, fps}')
 
         # dilated knn
+        parser.add_argument('--use_unet', action="store_true",
+                            help='use unet instead of dilated graph convolution')
+
+        parser.add_argument('--no_dilation', action="store_false", dest="use_dilation",
+                            help='use dilated knn or not')
         parser.add_argument('--epsilon', default=0.2, type=float, help='stochastic epsilon for gcn')
-        parser.add_argument('--stochastic', default=True,  type=bool, help='stochastic for gcn, True or False')
+        parser.add_argument('--no_stochastic', action="store_false", dest="use_stochastic",
+                            help='stochastic for gcn, True or False')
+
         args = parser.parse_args()
 
         args.device = torch.device('cuda' if not args.use_cpu and torch.cuda.is_available() else 'cpu')
@@ -109,10 +116,11 @@ class OptInit:
         timestamp = time.strftime('%Y%m%d_%H%M%S')
 
         if not self.args.exp_name:
-            self.args.exp_name = '{}-{}-{}-n{}-C{}-norm_{}-lr{}-B{}' \
+            self.args.exp_name = '{}-{}-{}-n{}-C{}-norm_{}-stochastic_{}-dilation_{}-lr{}-B{}' \
                 .format(os.path.basename(os.getcwd()),  # using the basename as the experiment prefix name.
                         self.args.block, self.args.conv, self.args.n_blocks, self.args.n_filters,
-                        self.args.norm, self.args.lr, self.args.batch_size)
+                        self.args.norm, self.args.use_stochastic, self.args.use_dilation,
+                        self.args.lr, self.args.batch_size)
         if not self.args.job_name:
             self.args.job_name = '_'.join([self.args.exp_name, timestamp, str(uuid.uuid4())])
         self.args.exp_dir = os.path.join(self.args.root_dir, self.args.job_name)
