@@ -49,7 +49,8 @@ def main():
     opt.test_value = 0.
 
     logging.info('===> start training ...')
-    for _ in range(opt.epoch, opt.epoch + opt.epochs):
+    epoch_when_finish = max(opt.max_epochs, opt.epoch + opt.epochs)
+    for _ in range(opt.epoch, epoch_when_finish):
         opt.epoch += 1
         logging.info('Epoch:{}'.format(opt.epoch))
         train(model, train_loader, optimizer, criterion, opt)

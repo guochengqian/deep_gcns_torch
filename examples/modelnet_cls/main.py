@@ -34,7 +34,8 @@ def train(model, train_loader, test_loader, opt):
     avg_acc_when_best = 0.
 
     logging.info('===> start training ...')
-    for _ in range(opt.epoch, opt.epoch + opt.epochs):
+    epoch_when_finish = max(opt.max_epochs, opt.epoch + opt.epochs)
+    for _ in range(opt.epoch, epoch_when_finish):
         opt.epoch += 1
         # reset tracker
         opt.train_losses.reset()
