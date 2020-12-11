@@ -35,7 +35,7 @@ def dis_cluster(logit, label, num_classes):
     X_labels = []
     X_labels_sum = []
 
-    n_clss = len(np.unique)
+    n_clss = len(np.unique(label))
     if n_clss == 1:
         return 1, 1
     else:
