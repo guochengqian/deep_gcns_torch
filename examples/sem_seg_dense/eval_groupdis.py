@@ -58,8 +58,6 @@ def dis_cluster(logit, label, num_classes):
                 dis_intra += np.mean(dists)
         dis_intra /= n_clss
 
-        if n_clss == 1:
-            print(f"n_clss: {n_clss}")
         dis_inter = 0.
         for i in range(num_classes-1):
             x2_i = X_labels_sum[i]
@@ -89,7 +87,8 @@ def test(model, loader, opt):
 
             # forward
             data.x = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
-            out = model(data.pos, data.x)
+            # out = model(data.pos, data.x)
+            out, last_feat = model(data.pos, data.x)
 
             # mIoU
             pred = out.max(dim=1)[1]
@@ -105,7 +104,8 @@ def test(model, loader, opt):
 
             # Group Distance Ratio
             label = gt.cpu().numpy().reshape(-1)
-            logit = out.cpu().numpy().transpose(0, 2, 1).reshape(-1, opt.n_classes)
+            C = last_feat.shape[1]
+            logit = last_feat.squeeze(-1).cpu().numpy().transpose(0, 2, 1).reshape(-1, C)  # 64 is the channels.
             dis_intra, dis_inter = dis_cluster(logit, label, num_classes=opt.n_classes)
             dis_ratio = dis_inter / dis_intra
             dis_ratio = 1. if np.isnan(dis_ratio) else dis_ratio

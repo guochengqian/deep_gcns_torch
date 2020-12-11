@@ -53,7 +53,7 @@ class DenseDeepGCN(torch.nn.Module):
         for i in range(self.n_blocks-1):
             feats.append(self.backbone[i](feats[-1]))
 
-        # featmaps = feats.copy()
+        last_feat = feats[-1]
         feats = torch.cat(feats, dim=1)
 
         fusion = torch.max_pool2d(self.fusion_block(feats), kernel_size=[feats.shape[2], feats.shape[3]])
@@ -61,7 +61,8 @@ class DenseDeepGCN(torch.nn.Module):
         out = self.prediction(torch.cat((fusion, feats), dim=1))
         # featmaps.append(out.clone())
         # return out.squeeze(-1), featmaps
-        return out.squeeze(-1)
+        return out.squeeze(-1), last_feat
+        # return out.squeeze(-1)
 
 
 class DeepGCNUNet(torch.nn.Module):
