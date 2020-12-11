@@ -56,20 +56,22 @@ def main():
         train(model, train_loader, optimizer, criterion, opt)
         if opt.epoch % opt.eval_freq == 0 and opt.eval_freq != -1:
             test(model, test_loader, opt)
-        scheduler.step()
+            # ------------------ save checkpoints
+            # min or max. based on the metrics
+            is_best = (opt.test_value < opt.best_value)
+            opt.best_value = max(opt.test_value, opt.best_value)
+            model_cpu = {k: v.cpu() for k, v in model.state_dict().items()}
+            save_checkpoint({
+                'epoch': opt.epoch,
+                'state_dict': model_cpu,
+                'optimizer_state_dict': optimizer.state_dict(),
+                'scheduler_state_dict': scheduler.state_dict(),
+                'best_value': opt.best_value,
+            }, is_best, opt.ckpt_dir, opt.exp_name)
+            if is_best:
+                logging.info(f"Find the new best checkpoint at Epoch {opt.epoch} with value {opt.best_value} \n")
 
-        # ------------------ save checkpoints
-        # min or max. based on the metrics
-        is_best = (opt.test_value < opt.best_value)
-        opt.best_value = max(opt.test_value, opt.best_value)
-        model_cpu = {k: v.cpu() for k, v in model.state_dict().items()}
-        save_checkpoint({
-            'epoch': opt.epoch,
-            'state_dict': model_cpu,
-            'optimizer_state_dict': optimizer.state_dict(),
-            'scheduler_state_dict': scheduler.state_dict(),
-            'best_value': opt.best_value,
-        }, is_best, opt.ckpt_dir, opt.exp_name)
+        scheduler.step()
 
         # ------------------ tensorboard log
         info = {
@@ -143,7 +145,7 @@ def test(model, loader, opt):
             logging.info("===> mIOU for class {}: {}".format(cl, ious[cl]))
 
     opt.test_value = iou
-    logging.info('TEST Epoch: [{}]\t mIoU: {:.4f}\t'.format(opt.epoch, opt.test_value))
+    logging.info('TEST Epoch: [{}]\t mIoU: {:.4f}\t best mIoU {:.4f}'.format(opt.epoch, opt.test_value, opt.best_value))
 
 
 if __name__ == '__main__':

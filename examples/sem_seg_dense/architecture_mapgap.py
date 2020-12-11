@@ -5,6 +5,7 @@ from torch.nn import Sequential as Seq
 from gcn_lib.dense.sampling import DenseRandomSampler, DenseFPSSampler
 from gcn_lib.dense.upsampling import DenseFPModule
 from torch_geometric.data import Data
+import warnings
 
 
 class DenseDeepGCN(torch.nn.Module):
@@ -25,21 +26,43 @@ class DenseDeepGCN(torch.nn.Module):
         self.head = GraphConv2d(opt.in_channels, channels, conv, act, norm, bias)
 
         if opt.block.lower() == 'res':
-            self.backbone = Seq(*[ResDynBlock2d(channels, k, 1+i, conv, act, norm, bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks-1)])
+            if opt.use_dilation:
+                self.backbone = Seq(*[ResDynBlock2d(channels, k, 1+i, conv, act, norm, bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks-1)])
+            else:
+                self.backbone = Seq(*[ResDynBlock2d(channels, k, 1, conv, act, norm, bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks-1)])
+
             fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
+
         elif opt.block.lower() == 'dense':
-            self.backbone = Seq(*[DenseDynBlock2d(channels+c_growth*i, c_growth, k, 1+i, conv, act,
-                                                  norm, bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks-1)])
+            if opt.use_dilation:
+                self.backbone = Seq(*[DenseDynBlock2d(channels+c_growth*i, c_growth, k, 1+i, conv, act,
+                                                      norm, bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks-1)])
+            else:
+                self.backbone = Seq(*[DenseDynBlock2d(channels+c_growth*i, c_growth, k, 1, conv, act,
+                                                      norm, bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks-1)])
             fusion_dims = int(
                 (channels + channels + c_growth * (self.n_blocks - 1)) * self.n_blocks // 2)
         else:
-            stochastic = False
-
-            self.backbone = Seq(*[PlainDynBlock2d(channels, k, 1, conv, act, norm,
-                                                  bias, stochastic, epsilon)
-                                  for i in range(self.n_blocks - 1)])
+            if opt.use_dilation:
+                warnings.warn("use_dilation is set to True for PlainGCN. "
+                              "Make sure this is what you want. "
+                              "if not, please use no_stochastic, no_dilation")
+            if stochastic:
+                warnings.warn("use_stochastic is set to True for PlainGCN. "
+                              "Make sure this is what you want. "
+                              "if not, please use no_stochastic, no_dilation")
+            if opt.use_dilation:
+                self.backbone = Seq(*[PlainDynBlock2d(channels, k, 1+i, conv, act, norm,
+                                                      bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks - 1)])
+            else:
+                self.backbone = Seq(*[PlainDynBlock2d(channels, k, 1, conv, act, norm,
+                                                      bias, stochastic, epsilon)
+                                      for i in range(self.n_blocks - 1)])
             fusion_dims = int(channels + c_growth * (self.n_blocks - 1))
 
         self.fusion_block = BasicConv([fusion_dims, 1024], act, norm, bias)
