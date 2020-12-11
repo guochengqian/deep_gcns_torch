@@ -68,7 +68,7 @@ def dis_cluster(logit, label, num_classes):
                 if len(x2_i) and len(x2_j):
                     dists = x2_i + x2_j.T - 2 * np.matmul(X_labels[i], X_labels[j].T)
                     dis_inter += np.mean(dists)
-        num_inter = float(n_clss * (n_clss-1) / 2)
+        num_inter = float((n_clss - 1) * n_clss)
         dis_inter /= num_inter
 
         return dis_intra, dis_inter
