@@ -38,13 +38,14 @@ def dis_cluster(logit, label, num_classes):
     n_clss = 0.
     for i in range(num_classes):
         X_label = logit[label == i]
-        h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
-        h_norm[h_norm == 0.] = 1e-3
-
-        if len(h_norm):
+        if len(X_label):
             n_clss += 1.
 
-        X_label = X_label / np.sqrt(h_norm)
+        h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
+        h_norm[h_norm == 0.] = 1e-3
+        h_norm = np.sqrt(h_norm)
+
+        X_label = X_label / h_norm
         X_labels.append(X_label)
         X_labels_sum.append(np.sum(np.square(X_label), axis=1, keepdims=True))
 
@@ -100,15 +101,15 @@ def test(model, loader, opt):
                 Us[i, cl] = U
 
             # Group Distance Ratio
-            label = gt.cpu().numpy()
-            logit = out.cpu().numpy().transpose(0, 2, 1)
+            label = gt.cpu().numpy().reshape(-1)
+            logit = out.cpu().numpy().transpose(0, 2, 1).reshape(-1, opt.n_classes)
             dis_intra, dis_inter = dis_cluster(logit, label, num_classes=opt.n_classes)
             dis_ratio = dis_inter / dis_intra
             dis_ratio = 1. if np.isnan(dis_ratio) else dis_ratio
             group_dists.append(dis_ratio)
 
             # Instance Distance
-            ins_dist = mi_kde(logit.reshape(-1, opt.n_classes), data.x.cpu().numpy().squeeze(-1).transpose(0,2,1).reshape(-1, 9), var=0.1)
+            ins_dist = mi_kde(logit, data.x.cpu().numpy().squeeze(-1).transpose(0,2,1).reshape(-1, 9), var=0.1)
             ins_dists.append(ins_dist)
 
     group_dist = np.nanmean(group_dists)
