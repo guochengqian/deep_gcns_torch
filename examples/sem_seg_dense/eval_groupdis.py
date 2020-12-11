@@ -35,40 +35,43 @@ def dis_cluster(logit, label, num_classes):
     X_labels = []
     X_labels_sum = []
 
-    n_clss = 0.
-    for i in range(num_classes):
-        X_label = logit[label == i]
-        if len(X_label):
-            n_clss += 1.
+    n_clss = len(np.unique)
+    if n_clss == 1:
+        return 1, 1
+    else:
+        for i in range(num_classes):
+            X_label = logit[label == i]
 
-        h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
-        h_norm[h_norm == 0.] = 1e-3
-        h_norm = np.sqrt(h_norm)
+            h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
+            h_norm[h_norm == 0.] = 1e-3
+            h_norm = np.sqrt(h_norm)
 
-        X_label = X_label / h_norm
-        X_labels.append(X_label)
-        X_labels_sum.append(np.sum(np.square(X_label), axis=1, keepdims=True))
+            X_label = X_label / h_norm
+            X_labels.append(X_label)
+            X_labels_sum.append(np.sum(np.square(X_label), axis=1, keepdims=True))
 
-    dis_intra = 0.
-    for i in range(num_classes):
-        x2 = X_labels_sum[i]
-        if len(x2):  # avoid empty list
-            dists = x2 + x2.T - 2 * np.matmul(X_labels[i], X_labels[i].T)
-            dis_intra += np.mean(dists)
-    dis_intra /= n_clss
+        dis_intra = 0.
+        for i in range(num_classes):
+            x2 = X_labels_sum[i]
+            if len(x2):  # avoid empty list
+                dists = x2 + x2.T - 2 * np.matmul(X_labels[i], X_labels[i].T)
+                dis_intra += np.mean(dists)
+        dis_intra /= n_clss
 
-    dis_inter = 0.
-    for i in range(num_classes-1):
-        x2_i = X_labels_sum[i]
-        for j in range(i+1, num_classes):
-            x2_j = X_labels_sum[j]
-            if len(x2_i) and len(x2_j):
-                dists = x2_i + x2_j.T - 2 * np.matmul(X_labels[i], X_labels[j].T)
-                dis_inter += np.mean(dists)
-    num_inter = float(n_clss * (n_clss-1) / 2)
-    dis_inter /= num_inter
+        if n_clss == 1:
+            print(f"n_clss: {n_clss}")
+        dis_inter = 0.
+        for i in range(num_classes-1):
+            x2_i = X_labels_sum[i]
+            for j in range(i+1, num_classes):
+                x2_j = X_labels_sum[j]
+                if len(x2_i) and len(x2_j):
+                    dists = x2_i + x2_j.T - 2 * np.matmul(X_labels[i], X_labels[j].T)
+                    dis_inter += np.mean(dists)
+        num_inter = float(n_clss * (n_clss-1) / 2)
+        dis_inter /= num_inter
 
-    return dis_intra, dis_inter
+        return dis_intra, dis_inter
 
 
 def test(model, loader, opt):
