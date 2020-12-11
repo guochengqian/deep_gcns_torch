@@ -34,13 +34,19 @@ def dis_cluster(logit, label, num_classes):
 
     X_labels = []
     X_labels_sum = []
+
+    n_clss = 0.
     for i in range(num_classes):
         X_label = logit[label == i]
         h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
         h_norm[h_norm == 0.] = 1e-3
+
+        if len(h_norm):
+            n_clss += 1.
+
         X_label = X_label / np.sqrt(h_norm)
         X_labels.append(X_label)
-        X_labels_sum.append(np.sum(np.square(X_labels[i]), axis=1, keepdims=True))
+        X_labels_sum.append(np.sum(np.square(X_label), axis=1, keepdims=True))
 
     dis_intra = 0.
     for i in range(num_classes):
@@ -48,7 +54,7 @@ def dis_cluster(logit, label, num_classes):
         if len(x2):  # avoid empty list
             dists = x2 + x2.T - 2 * np.matmul(X_labels[i], X_labels[i].T)
             dis_intra += np.mean(dists)
-    dis_intra /= num_classes
+    dis_intra /= n_clss
 
     dis_inter = 0.
     for i in range(num_classes-1):
@@ -58,11 +64,9 @@ def dis_cluster(logit, label, num_classes):
             if len(x2_i) and len(x2_j):
                 dists = x2_i + x2_j.T - 2 * np.matmul(X_labels[i], X_labels[j].T)
                 dis_inter += np.mean(dists)
-    num_inter = float(num_classes * (num_classes-1) / 2)
+    num_inter = float(n_clss * (n_clss-1) / 2)
     dis_inter /= num_inter
 
-    # print('dis_intra: ', dis_intra)
-    # print('dis_inter: ', dis_inter)
     return dis_intra, dis_inter
 
 
@@ -108,7 +112,7 @@ def test(model, loader, opt):
             ins_dists.append(ins_dist)
 
     group_dist = np.nanmean(group_dists)
-    logging.info(f"The group distance is {group_dist}")
+    logging.info(f"The Group Distance is {group_dist}")
 
     # show the instance distance 
     ins_dist = np.nanmean(ins_dists)
