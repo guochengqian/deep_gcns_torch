@@ -16,7 +16,7 @@ class DenseDeepGCN(torch.nn.Module):
         norm = opt.norm
         bias = opt.bias
         epsilon = opt.epsilon
-        stochastic = opt.stochastic
+        stochastic = opt.use_stochastic
         conv = opt.conv
         c_growth = channels
         self.n_blocks = opt.n_blocks
@@ -53,14 +53,15 @@ class DenseDeepGCN(torch.nn.Module):
         for i in range(self.n_blocks-1):
             feats.append(self.backbone[i](feats[-1]))
 
-        featmaps = feats.copy()
+        # featmaps = feats.copy()
         feats = torch.cat(feats, dim=1)
 
         fusion = torch.max_pool2d(self.fusion_block(feats), kernel_size=[feats.shape[2], feats.shape[3]])
         fusion = torch.repeat_interleave(fusion, repeats=feats.shape[2], dim=2)
         out = self.prediction(torch.cat((fusion, feats), dim=1))
-        featmaps.append(out.clone())
-        return out.squeeze(-1), featmaps
+        # featmaps.append(out.clone())
+        # return out.squeeze(-1), featmaps
+        return out.squeeze(-1)
 
 
 class DeepGCNUNet(torch.nn.Module):

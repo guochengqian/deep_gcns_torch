@@ -1,6 +1,7 @@
 import __init__
 from tqdm import tqdm
 import numpy as np
+import torch
 import torch_geometric.datasets as GeoData
 from torch_geometric.data import DenseDataLoader
 import torch_geometric.transforms as T
@@ -8,7 +9,7 @@ from config import OptInit
 from architecture_mapgap import DenseDeepGCN
 from utils.ckpt_util import load_pretrained_models
 import logging
-from MADGap import *
+from MI import mi_kde
 
 
 def main():
@@ -29,16 +30,48 @@ def main():
     test(model, test_loader, opt)
 
 
+def dis_cluster(logit, label, num_classes):
+
+    X_labels = []
+    X_labels_sum = []
+    for i in range(num_classes):
+        X_label = logit[label == i]
+        h_norm = np.sum(np.square(X_label), axis=1, keepdims=True)
+        h_norm[h_norm == 0.] = 1e-3
+        X_label = X_label / np.sqrt(h_norm)
+        X_labels.append(X_label)
+        X_labels_sum.append(np.sum(np.square(X_labels[i]), axis=1, keepdims=True))
+
+    dis_intra = 0.
+    for i in range(num_classes):
+        x2 = X_labels_sum[i]
+        if len(x2):  # avoid empty list
+            dists = x2 + x2.T - 2 * np.matmul(X_labels[i], X_labels[i].T)
+            dis_intra += np.mean(dists)
+    dis_intra /= num_classes
+
+    dis_inter = 0.
+    for i in range(num_classes-1):
+        x2_i = X_labels_sum[i]
+        for j in range(i+1, num_classes):
+            x2_j = X_labels_sum[j]
+            if len(x2_i) and len(x2_j):
+                dists = x2_i + x2_j.T - 2 * np.matmul(X_labels[i], X_labels[j].T)
+                dis_inter += np.mean(dists)
+    num_inter = float(num_classes * (num_classes-1) / 2)
+    dis_inter /= num_inter
+
+    # print('dis_intra: ', dis_intra)
+    # print('dis_inter: ', dis_inter)
+    return dis_intra, dis_inter
+
+
 def test(model, loader, opt):
     Is = np.empty((len(loader), opt.n_classes))
     Us = np.empty((len(loader), opt.n_classes))
-    n_layers = opt.n_blocks + 1
-    n_batch = len(loader)
-    n_classes = opt.n_classes
 
-    mean_MAD_mat = torch.zeros(n_batch, n_layers)
-    MADFarthest_mat = torch.zeros(n_batch, n_layers)
-    MADClosest_mat = torch.zeros(n_batch, n_layers)
+    group_dists = []
+    ins_dists = []
 
     model.eval()
     with torch.no_grad():
@@ -48,7 +81,7 @@ def test(model, loader, opt):
 
             # forward
             data.x = torch.cat((data.pos.transpose(2, 1).unsqueeze(3), data.x.transpose(2, 1).unsqueeze(3)), 1)
-            out, feats = model(data.pos, data.x)
+            out = model(data.pos, data.x)
 
             # mIoU
             pred = out.max(dim=1)[1]
@@ -62,26 +95,25 @@ def test(model, loader, opt):
                 Is[i, cl] = I
                 Us[i, cl] = U
 
-            # MADGap
-            label = gt.view(-1)
+            # Group Distance Ratio
+            label = gt.cpu().numpy()
+            logit = out.cpu().numpy().transpose(0, 2, 1)
+            dis_intra, dis_inter = dis_cluster(logit, label, num_classes=opt.n_classes)
+            dis_ratio = dis_inter / dis_intra
+            dis_ratio = 1. if np.isnan(dis_ratio) else dis_ratio
+            group_dists.append(dis_ratio)
 
-            # removes the dominant classes such ceiling floor and wall. Class imbalance
-            mask = (label != 0) * (label != 1) * (label != 2)
-            # for j in range(n_layers):
-            j = n_layers-1
-            feat = feats[j].squeeze(-1).permute(0, 2, 1)    # feat: B, N, C
-            mean_MAD, MADFarthest, MADClosest = batchwise_MADGap(feat, 16, j + 1)
-            MADFarthest = MADFarthest.view(-1)
-            MADClosest = MADClosest.view(-1)
-            mean_MAD_mat[i, j] = mean_MAD
-            MADFarthest_mat[i, j] = nanmean(MADFarthest[mask])
-            MADClosest_mat[i, j] = nanmean(MADClosest[mask])
-    MADGap = nanmean(MADFarthest_mat - MADClosest_mat, dim=0, keepdims=False)
-    torch.save(MADGap, '{}/{}'.format(opt.res_dir, 'madgap.pt'))
-    logging.info(MADGap)
+            # Instance Distance
+            ins_dist = mi_kde(logit.reshape(-1, opt.n_classes), data.x.cpu().numpy().squeeze(-1).transpose(0,2,1).reshape(-1, 9), var=0.1)
+            ins_dists.append(ins_dist)
 
-    mean_MAD = torch.mean(mean_MAD_mat, dim=0, keepdim=False)
-    logging.info(mean_MAD)
+    group_dist = np.nanmean(group_dists)
+    logging.info(f"The group distance is {group_dist}")
+
+    # show the instance distance 
+    ins_dist = np.nanmean(ins_dists)
+    logging.info(f"The Instance Distance is {ins_dist}")
+
     ious = np.divide(np.sum(Is, 0), np.sum(Us, 0))
     ious[np.isnan(ious)] = 1
     for cl in range(opt.n_classes):
